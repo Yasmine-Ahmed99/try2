@@ -1,42 +1,39 @@
-# streamlit run CIFAR10ClassifierApp.py
-
+# Text summarization
+# streamlit run summarizeAPP.py
 
 import streamlit as st
-import numpy as np
-import tensorflow as tf
-from tensorflow.keras.applications.vgg16 import preprocess_input
-from tensorflow.keras.preprocessing import image
-from PIL import Image
+from transformers import BartTokenizer, BartForConditionalGeneration
+import torch
 
-# Load the saved model
-model = tf.keras.models.load_model('cifar10_model.h5')
-# classifier = pipeline("image-classification", model="Falconsai/nsfw_image_detection")
-#  preprocess >> model  >> preprocess
+class TextSummarizer:
+
+    def __init__(self):
+        # Load pretrained model and tokenizer
+        self.tokenizer = BartTokenizer.from_pretrained('facebook/bart-large-cnn')
+        self.model = BartForConditionalGeneration.from_pretrained('facebook/bart-large-cnn')
+
+    def summarize(self, text):
+        inputs = self.tokenizer(text, return_tensors="pt", max_length=1024, truncation=True)
 
 
-# Define CIFAR-10 classes
-classes = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
+        summary_ids = self.model.generate(inputs.input_ids, num_beams=4, max_length=150, early_stopping=True)
 
-st.title("CIFAR-10 Image Classifier")
-st.write("Upload a colored image to classify it into one of the CIFAR-10 categories.")
 
-# Upload the image
-uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "png", "jpeg"])
-
-if uploaded_file is not None: 
-    # Preprocess the image
-    img = Image.open(uploaded_file)  # metadata img to tensors    
-    img = img.resize((32, 32))  # the same shape like input shape for the model 
-    img_array = image.img_to_array(img)   # 
-    img_array = np.expand_dims(img_array, axis=0)  # batch 
-    # img_array = preprocess_input(img_array) # [1,32,32,3] 
-    img_array = img_array.astype('float32') /255.0
     
+        summary = self.tokenizer.decode(summary_ids[0], skip_special_tokens=True) # skip_special_tokens like padding tokens
+        return summary
 
-    # Classify the image
-    predictions = model.predict(img_array) # list of proba   [0.1 ,0.0 , 0.5 ,,,, 0.9]
-    predicted_class = classes[np.argmax(predictions)] # text 
-# np.argmax(predictions) ---> 9 
-    # Display the image and the prediction
-    st.image(uploaded_file, caption='Uploaded Image', use_column_width=True)
-    st.write(f"Prediction: **{predicted_class}**")
+def main():
+    st.title("Text Summarization App")
+    summarizer = TextSummarizer()
+
+    text = st.text_area("Enter text for summarization")
+    if st.button("Summarize"):
+        if text:
+            summary = summarizer.summarize(text)
+            st.write(f"Summary: {summary}")
+        else:
+            st.write("Please enter some text.")
+
+if __name__ == "__main__":
+    main()
